@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивный Параллакс Фон</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka One', cursive, sans-serif;
+            background-color: #000;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- СТИЛИ ИНТЕРФЕЙСА (UI) --- */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: none; 
+            flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 20; color: white;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+
+        /* --- ЗАГРУЗОЧНЫЙ ЭКРАН --- */
+        #screenLoading {
+            background: transparent; 
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        
+        .loading-header {
+            position: absolute;
+            top: 15%;
+            width: 100%;
+            text-align: center;
+            animation: floatText 3s ease-in-out infinite;
+        }
+
+        .loading-header h1 {
+            font-size: 80px; 
+            letter-spacing: 5px; 
+            color: #f1c40f; 
+            text-shadow: 0 8px 0 #d35400, 0 10px 20px rgba(0,0,0,0.8); 
+            -webkit-text-stroke: 3px #5e3314; 
+            margin: 0;
+        }
+
+        .loading-header p {
+            font-size: 28px; 
+            color: #fff; 
+            text-shadow: 2px 3px 5px rgba(0,0,0,0.9); 
+            margin-top: 10px;
+        }
+
+        @keyframes floatText {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .loading-bar-wrapper {
+            position: absolute;
+            bottom: 40px;
+            width: 60%;
+            left: 20%;
+        }
+
+        .loading-bar-container {
+            background: #2c3e50; 
+            padding: 10px; 
+            border-radius: 25px; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5);
+            border: 3px solid #1a252f;
+        }
+
+        .loading-bar-track {
+            background: #1e293b; 
+            border-radius: 15px; 
+            height: 30px; 
+            overflow: hidden; 
+            position: relative;
+            box-shadow: inset 0 4px 6px rgba(0,0,0,0.4);
+        }
+
+        #loadingBarFill {
+            width: 0%; 
+            height: 100%; 
+            background: linear-gradient(90deg, #f1c40f, #f39c12, #d35400); 
+            box-shadow: inset 0 4px 6px rgba(255,255,255,0.4);
+            border-radius: 15px;
+            /* Плавное заполнение */
+            transition: width 0.1s linear; 
+        }
+
+        /* --- ГЛАВНОЕ МЕНЮ --- */
+        #screenMenu {
+            background: radial-gradient(ellipse at 50% 100%, rgba(160, 255, 120, 0.25) 0%, rgba(20, 80, 40, 0.4) 60%, rgba(10, 30, 20, 0.7) 100%);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+
+        @keyframes sunRays {
+            0% { opacity: 0.3; transform: translateX(-2%) scale(1); }
+            50% { opacity: 0.7; transform: translateX(2%) scale(1.05); }
+            100% { opacity: 0.3; transform: translateX(-2%) scale(1); }
+        }
+
+        #screenMenu::before {
+            content: '';
+            position: absolute;
+            top: -20%; left: -20%; width: 140%; height: 140%;
+            background: 
+                linear-gradient(115deg, transparent 40%, rgba(220, 255, 180, 0.25) 48%, transparent 55%),
+                linear-gradient(85deg, transparent 50%, rgba(220, 255, 180, 0.2) 60%, transparent 70%);
+            animation: sunRays 8s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(25px);
+        }
+
+        /* Игровая панель (окно меню) */
+        .panel {
+            position: relative; 
+            z-index: 1;
+            background: #2a3441;
+            border: 6px solid #8e9eab;
+            padding: 30px 50px;
+            border-radius: 30px;
+            text-align: center;
+            box-shadow: 
+                0 20px 50px rgba(0,0,0,0.8), 
+                inset 0 0 20px rgba(0,0,0,0.5),
+                inset 0 4px 0 rgba(255,255,255,0.2);
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+        
+        .panel::-webkit-scrollbar { width: 8px; }
+        .panel::-webkit-scrollbar-thumb { background: #8e9eab; border-radius: 4px; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .panel h1 { 
+            margin: 0 0 10px 0; 
+            font-size: 58px; 
+            letter-spacing: 3px; 
+            color: #f1c40f;
+            text-shadow: 0 6px 0 #d35400, 0 8px 10px rgba(0,0,0,0.6); 
+            -webkit-text-stroke: 2px #5e3314;
+        }
+        .panel h2 { 
+            margin: 0 0 15px 0; 
+            font-size: 40px; 
+            color: #4bd286; 
+            text-shadow: 0 5px 0 #1e7040, 0 6px 10px rgba(0,0,0,0.5); 
+            -webkit-text-stroke: 2px #0f3d21;
+        }
+        .panel h2.danger {
+            color: #e74c3c;
+            text-shadow: 0 5px 0 #922b21, 0 6px 10px rgba(0,0,0,0.5); 
+            -webkit-text-stroke: 2px #511812;
+        }
+        .panel p { font-size: 20px; margin-bottom: 25px; color: #d1d8e0; text-shadow: 1px 2px 3px rgba(0,0,0,0.8); }
+        
+        .btn-container { 
+            display: flex; 
+            flex-direction: column;
+            gap: 15px; 
+            align-items: center; 
+        }
+
+        /* --- СТИЛЬ КНОПОК --- */
+        .game-button {
+            position: relative;
+            background: #1e293b; 
+            border: none;
+            border-radius: 20px;
+            padding: 0;
+            cursor: pointer;
+            outline: none;
+            width: 320px;
+            max-width: 100%;
+            box-shadow: 
+                0 0 0 6px #8e9eab, 
+                0 8px 0 6px #5c6a79, 
+                0 12px 15px 6px rgba(0,0,0,0.6);
+            transition: transform 0.1s;
+            margin-bottom: 8px; 
+        }
+
+        .game-button .inner {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, #4bd286 0%, #20995a 100%);
+            border-radius: 16px;
+            padding: 14px 20px;
+            box-shadow: 
+                inset 0 4px 6px rgba(255,255,255,0.4), 
+                inset 0 -4px 6px rgba(0,0,0,0.3);
+            border: 2px solid #145e36;
+        }
+
+        .game-button .text {
+            font-family: 'Fredoka One', cursive;
+            font-size: 28px;
+            color: #e2e8f0;
+            letter-spacing: 2px;
+            text-shadow:
+                -2px -2px 0 #1e293b, 2px -2px 0 #1e293b,
+                -2px  2px 0 #1e293b, 2px  2px 0 #1e293b,
+                 0    4px 0 #0f172a, 0    5px 5px rgba(0,0,0,0.5);
+        }
+
+        .game-button::before, .game-button::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle at 30% 30%, #eef2f3 0%, #8e9eab 50%, #3e4a56 100%);
+            border: 3px solid #2c3e50;
+            border-radius: 50%;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5), 0 4px 6px rgba(0,0,0,0.6);
+            z-index: 2;
+        }
+        
+        .game-button::before { top: -10px; right: -10px; }
+        .game-button::after { bottom: -10px; left: -10px; }
+
+        .game-button:active {
+            transform: translateY(6px);
+            box-shadow: 
+                0 0 0 6px #8e9eab, 
+                0 2px 0 6px #5c6a79, 
+                0 5px 10px 6px rgba(0,0,0,0.6);
+        }
+
+        .game-button.secondary .inner {
+            background: linear-gradient(180deg, #a4b0be 0%, #57606f 100%);
+            border-color: #2f3542;
+        }
+
+        .game-button.level-btn .inner { padding: 10px 20px; }
+        .game-button.level-btn small {
+            display: block;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.9);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            margin-top: 4px;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        #hud {
+            position: absolute; top: 20px; left: 30px; z-index: 10;
+            font-size: 32px; color: #f1c40f;
+            text-shadow: 0 4px 0 #d35400, 0 4px 6px rgba(0,0,0,0.8);
+            -webkit-text-stroke: 1px #5e3314;
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- ИГРОВОЙ ХУД -->
+    <div id="hud">Уровень: <span id="hudLevel">1</span> &nbsp;|&nbsp; Счёт: <span id="hudScore">0</span></div>
+
+    <!-- ЭКРАН ЗАГРУЗКИ -->
+    <div id="screenLoading" class="screen active">
+        <div class="loading-header">
+            <h1>DINO RUN</h1>
+            <p>Загрузка чудес...</p>
+        </div>
+        <div class="loading-bar-wrapper">
+            <div class="loading-bar-container">
+                <div class="loading-bar-track">
+                    <div id="loadingBarFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ГЛАВНОЕ МЕНЮ -->
+    <div id="screenMenu" class="screen">
+        <div class="panel">
+            <h1>DINO RUN</h1>
+            <p>Новые локации и препятствия!</p>
+            <div class="btn-container">
+                <button class="game-button" id="btnPlayMenu">
+                    <span class="inner"><span class="text">Играть</span></span>
+                </button>
+                <button class="game-button secondary" id="btnExit">
+                    <span class="inner"><span class="text">Выйти</span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ВЫБОРА УРОВНЯ -->
+    <div id="screenLevelSelect" class="screen">
+        <div class="panel">
+            <h2>ВЫБЕРИТЕ УРОВЕНЬ</h2>
+            <div class="btn-container">
+                <button class="game-button level-btn" id="btnLvl1">
+                    <span class="inner">
+                        <span class="text">Уровень 1</span>
+                        <small>Горы и Кактусы</small>
+                    </span>
+                </button>
+                <button class="game-button level-btn" id="btnLvl2">
+                    <span class="inner">
+                        <span class="text">Уровень 2</span>
+                        <small>Лес и Ящики</small>
+                    </span>
+                </button>
+                <button class="game-button level-btn" id="btnLvl3">
+                    <span class="inner" style="background: linear-gradient(180deg, #3498db 0%, #2980b9 100%); border-color: #1a5276;">
+                        <span class="text">Уровень 3</span>
+                        <small>Город и Машины</small>
+                    </span>
+                </button>
+                <button class="game-button secondary" id="btnBackToMenu">
+                    <span class="inner"><span class="text">Назад</span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПОБЕДЫ -->
+    <div id="screenLevelComplete" class="screen">
+        <div class="panel">
+            <h2>УРОВЕНЬ <span id="lcLevel">1</span> ПРОЙДЕН!</h2>
+            <p>Заработано очков: <span id="lcScore">0</span></p>
+            <div class="btn-container">
+                <button class="game-button" id="btnNextLevel">
+                    <span class="inner"><span class="text">Далее ➔</span></span>
+                </button>
+                <button class="game-button secondary" id="btnMenuFromComplete">
+                    <span class="inner"><span class="text">В меню</span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПРОИГРЫША -->
+    <div id="screenGameOver" class="screen">
+        <div class="panel">
+            <h2 class="danger">ИГРА ОКОНЧЕНА</h2>
+            <p>Вы дошли до Уровня <span id="goLevel">1</span> | Счёт: <span id="goScore">0</span></p>
+            <div class="btn-container">
+                <button class="game-button" id="btnRestart">
+                    <span class="inner"><span class="text">Повторить ⟳</span></span>
+                </button>
+                <button class="game-button secondary" id="btnMenuFromGameOver">
+                    <span class="inner"><span class="text">В меню</span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПОЛНОЙ ПОБЕДЫ -->
+    <div id="screenGameComplete" class="screen">
+        <div class="panel">
+            <h2 style="color: #f1c40f; text-shadow: 0 5px 0 #d35400, 0 6px 10px rgba(0,0,0,0.5);">ПОЗДРАВЛЯЕМ!</h2>
+            <p>Вы прошли все 3 уровня!<br>Ваш итоговый счёт: <span id="gcScore">0</span></p>
+            <div class="btn-container">
+                <button class="game-button" id="btnRestartGame">
+                    <span class="inner"><span class="text">Начать сначала</span></span>
+                </button>
+                <button class="game-button secondary" id="btnMenuFromWin">
+                    <span class="inner"><span class="text">В меню</span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Настройки и состояние
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let baseSpeed = 5; 
+        let scrollPos = 0;
+        
+        const TILE_WIDTH = 3000;
+
+        // UI Элементы
+        const screenLoading = document.getElementById('screenLoading');
+        const screenMenu = document.getElementById('screenMenu');
+        const screenLevelSelect = document.getElementById('screenLevelSelect');
+        const screenLevelComplete = document.getElementById('screenLevelComplete');
+        const screenGameOver = document.getElementById('screenGameOver');
+        const screenGameComplete = document.getElementById('screenGameComplete');
+        const hud = document.getElementById('hud');
+        
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            generateGround();
+        });
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // --- ДАННЫЕ ПРОЦЕДУРНОЙ ГЕНЕРАЦИИ ---
+        const clouds = [];
+        const mountainsFar = [];
+        const mountainsNear = [];
+        const forestFar = [];
+        const forestNear = [];
+        const cityBuildingsFar = [];
+        const cityBuildingsNear = [];
+        const cityTrees = [];
+        const groundElements = [];
+
+        // Палитры цветов
+        const colors = {
+            mountains: {
+                skyTop: '#4ca1df', skyBottom: '#cde6f9', cloud: 'rgba(255, 255, 255, 0.8)',
+                bgFar: '#6db5eb', bgNear: '#358adb', snow: '#ffffff',
+                groundRock: '#5c565e', groundRockDark: '#443f45', grassTop: '#80cd28', grassBottom: '#5da016'
+            },
+            sunset: { // Специальный красивый закат для экрана загрузки
+                skyTop: '#ff7b54', skyBottom: '#ffd56b', cloud: 'rgba(255, 255, 255, 0.6)',
+                bgFar: '#d16a49', bgNear: '#a34c32', snow: '#ffebc4',
+                groundRock: '#5c433d', groundRockDark: '#3d2c28', grassTop: '#e68f3e', grassBottom: '#b36822'
+            },
+            forest: {
+                skyTop: '#1b5e40', skyBottom: '#85d69e', cloud: 'rgba(180, 255, 200, 0.25)',
+                bgFar: '#184d33', bgNear: '#0d3320', 
+                groundRock: '#6b8e5c', groundRockDark: '#4a6b3e', grassTop: '#8ce067', grassBottom: '#5bb835'
+            },
+            city: {
+                skyTop: '#8ebce6', skyBottom: '#d0e5f5', cloud: 'rgba(255, 255, 255, 0.9)',
+                bgFar: '#a5c6e8', bgNear: '#5a82a8', 
+                groundRock: '#4f5054', groundRockDark: '#65786d', grassTop: '#8ba195', grassBottom: '#4f5054'
+            }
+        };
+
+        function getLevelType(level) {
+            const index = (level - 1) % 3;
+            if (index === 0) return 'mountains';
+            if (index === 1) return 'forest';
+            return 'city';
+        }
+
+        function initGenerator() {
+            for (let i = 0; i < 20; i++) {
+                clouds.push({ x: Math.random() * TILE_WIDTH, y: Math.random() * (height * 0.4), scale: 0.5 + Math.random() * 1.5, opacity: 0.5 + Math.random() * 0.5 });
+            }
+
+            let farX = 0; while (farX < TILE_WIDTH) { mountainsFar.push({ x: farX, w: 300 + Math.random() * 400, h: 200 + Math.random() * 200 }); farX += (300 + Math.random() * 400) * 0.6; }
+            let nearX = 0; while (nearX < TILE_WIDTH) { mountainsNear.push({ x: nearX, w: 400 + Math.random() * 600, h: 300 + Math.random() * 300 }); nearX += (400 + Math.random() * 600) * 0.5; }
+
+            let fFarX = 0; while (fFarX < TILE_WIDTH) { forestFar.push({ x: fFarX, w: 150 + Math.random() * 150, h: 250 + Math.random() * 150 }); fFarX += 100 + Math.random() * 100; }
+            let fNearX = 0; while (fNearX < TILE_WIDTH) { forestNear.push({ x: fNearX, w: 200 + Math.random() * 200, h: 400 + Math.random() * 200 }); fNearX += 150 + Math.random() * 100; }
+
+            let cFarX = 0; while (cFarX < TILE_WIDTH) { cityBuildingsFar.push({ x: cFarX, w: 80 + Math.random() * 120, h: 300 + Math.random() * 250, type: Math.floor(Math.random()*3) }); cFarX += 90 + Math.random() * 60; }
+            let cNearX = 0; while (cNearX < TILE_WIDTH) { cityBuildingsNear.push({ x: cNearX, w: 100 + Math.random() * 150, h: 200 + Math.random() * 300, type: Math.floor(Math.random()*3) }); cNearX += 120 + Math.random() * 80; }
+            let cTreeX = 0; while (cTreeX < TILE_WIDTH) { cityTrees.push({ x: cTreeX, scale: 0.6 + Math.random()*0.6 }); cTreeX += 200 + Math.random() * 300; }
+
+            generateGround();
+        }
+
+        function generateGround() {
+            groundElements.length = 0;
+            let gX = 0;
+            while (gX < TILE_WIDTH) {
+                const w = 100 + Math.random() * 150;
+                const offsetY = Math.random() * 15 - 5; 
+                const hasFlower = Math.random() > 0.6;
+                const flowerType = Math.random() > 0.5 ? 1 : 2; 
+                groundElements.push({ x: gX, w, offsetY, hasFlower, flowerType });
+                gX += w;
+            }
+        }
+
+        // --- ИГРОВАЯ МЕХАНИКА И СОСТОЯНИЕ ---
+        let gameState = 'loading'; // НАЧАЛЬНЫЙ СТАТУС - ЗАГРУЗКА
+        let currentLevel = 1;
+        let score = 0;
+        let loadProgress = 0;
+        
+        let spawnedObstacles = 0;
+        let targetObstacles = 10; 
+        
+        let dinoYOffset = 0;
+        let dinoVelocityY = 0;
+        const gravity = 0.6; 
+        const jumpForce = -18; 
+        let isJumping = false;
+
+        const obstacles = [];
+
+        // --- УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ ---
+        function switchScreen(screen) {
+            screenLoading.classList.remove('active');
+            screenMenu.classList.remove('active');
+            screenLevelSelect.classList.remove('active');
+            screenLevelComplete.classList.remove('active');
+            screenGameOver.classList.remove('active');
+            screenGameComplete.classList.remove('active');
+            hud.style.display = 'none';
+            if (screen) screen.classList.add('active');
+        }
+
+        function updateHUD() {
+            document.getElementById('hudLevel').textContent = currentLevel;
+            document.getElementById('hudScore').textContent = score;
+        }
+
+        function startGame(level) {
+            currentLevel = level;
+            score = level === 1 || level === 2 || level === 3 ? 0 : score;
+            baseSpeed = 5 + Math.floor((level - 1) / 2);
+            targetObstacles = 10 + (level - 1) * 3;
+            spawnedObstacles = 0;
+            obstacles.length = 0;
+            dinoYOffset = 0;
+            dinoVelocityY = 0;
+            isJumping = false;
+            
+            gameState = 'playing';
+            switchScreen(null);
+            hud.style.display = 'block';
+            updateHUD();
+        }
+
+        // Привязка кнопок UI
+        document.getElementById('btnPlayMenu').addEventListener('click', () => switchScreen(screenLevelSelect));
+        document.getElementById('btnExit').addEventListener('click', () => {
+            alert("Спасибо за игру! До встречи!"); window.close();
+            document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:20%; font-family:\'Fredoka One\'">Игра закрыта</h1>';
+        });
+        document.getElementById('btnBackToMenu').addEventListener('click', () => switchScreen(screenMenu));
+        
+        document.getElementById('btnLvl1').addEventListener('click', () => startGame(1));
+        document.getElementById('btnLvl2').addEventListener('click', () => startGame(2));
+        document.getElementById('btnLvl3').addEventListener('click', () => startGame(3));
+
+        document.getElementById('btnRestart').addEventListener('click', () => startGame(currentLevel));
+        document.getElementById('btnNextLevel').addEventListener('click', () => startGame(currentLevel + 1));
+        document.getElementById('btnRestartGame').addEventListener('click', () => startGame(1));
+        
+        const goToMenu = () => { gameState = 'menu'; switchScreen(screenMenu); obstacles.length = 0; };
+        document.getElementById('btnMenuFromComplete').addEventListener('click', goToMenu);
+        document.getElementById('btnMenuFromGameOver').addEventListener('click', goToMenu);
+        document.getElementById('btnMenuFromWin').addEventListener('click', goToMenu);
+
+        // Управление прыжком
+        function handleJump(e) {
+            if (e.target.closest('button')) return; 
+            if (e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+            
+            if (gameState === 'playing' && !isJumping) {
+                isJumping = true;
+                dinoVelocityY = jumpForce;
+            }
+        }
+        window.addEventListener('keydown', handleJump);
+        window.addEventListener('mousedown', handleJump);
+        window.addEventListener('touchstart', handleJump);
+
+        // --- ФУНКЦИИ ОТРИСОВКИ ---
+        function drawSky(palette) {
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, palette.skyTop); grad.addColorStop(1, palette.skyBottom);
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, width, height);
+        }
+
+        function drawCloud(x, y, scale, palette, opacity) {
+            ctx.fillStyle = palette.cloud; ctx.globalAlpha = opacity;
+            ctx.beginPath(); ctx.arc(x, y, 30 * scale, Math.PI * 0.5, Math.PI * 1.5);
+            ctx.arc(x + 30 * scale, y - 20 * scale, 35 * scale, Math.PI * 1, Math.PI * 2);
+            ctx.arc(x + 70 * scale, y - 10 * scale, 25 * scale, Math.PI * 1.2, Math.PI * 2);
+            ctx.arc(x + 90 * scale, y, 20 * scale, Math.PI * 1.5, Math.PI * 0.5);
+            ctx.fill(); ctx.globalAlpha = 1.0;
+        }
+
+        function drawMountain(x, baseH, w, h, color, snowColor) {
+            ctx.fillStyle = color; ctx.beginPath();
+            ctx.moveTo(x - w / 2, baseH); ctx.lineTo(x, baseH - h); ctx.lineTo(x + w / 2, baseH); ctx.fill();
+            if (snowColor) {
+                const snowH = h * 0.3; const snowW = w * 0.3; ctx.fillStyle = snowColor; ctx.beginPath(); 
+                ctx.moveTo(x, baseH - h); ctx.lineTo(x - snowW/2, baseH - h + snowH);
+                ctx.lineTo(x - snowW/4, baseH - h + snowH - 15); ctx.lineTo(x, baseH - h + snowH + 10);
+                ctx.lineTo(x + snowW/4, baseH - h + snowH - 5); ctx.lineTo(x + snowW/2, baseH - h + snowH); ctx.fill();
+            }
+        }
+
+        function drawTree(x, baseH, w, h, color) {
+            ctx.fillStyle = color; ctx.beginPath();
+            ctx.fillRect(x - w*0.1, baseH - h, w*0.2, h); 
+            ctx.arc(x, baseH - h + h*0.2, w*0.5, 0, Math.PI*2); 
+            ctx.arc(x - w*0.3, baseH - h + h*0.4, w*0.4, 0, Math.PI*2); 
+            ctx.arc(x + w*0.3, baseH - h + h*0.4, w*0.4, 0, Math.PI*2); ctx.fill();
+        }
+
+        function drawBuilding(x, baseH, w, h, color, type) {
+            ctx.fillStyle = color; ctx.fillRect(x, baseH - h, w, h);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)'; 
+            if (type === 0) {
+                for(let wy=baseH - h + 20; wy < baseH - 20; wy += 30) {
+                    for(let wx=x + 15; wx < x + w - 15; wx += 25) { ctx.fillRect(wx, wy, 15, 20); }
+                }
+            } else if (type === 1) {
+                for(let wy=baseH - h + 20; wy < baseH - 20; wy += 40) { ctx.fillRect(x + 10, wy, w - 20, 15); }
+                ctx.fillStyle = color; ctx.fillRect(x + w/2 - 2, baseH - h - 50, 4, 50); 
+            }
+        }
+
+        function drawCityTree(x, baseH, scale) {
+            ctx.save(); ctx.translate(x, baseH); ctx.scale(scale, scale);
+            ctx.fillStyle = '#614332'; ctx.fillRect(-5, -60, 10, 60);
+            ctx.fillStyle = '#8dc445'; ctx.beginPath(); ctx.arc(0, -90, 40, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#7eb03e'; ctx.beginPath(); ctx.arc(-25, -60, 30, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(25, -60, 30, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawGroundTile(startX, palette, layoutType) {
+            const groundY = height - 120;
+            
+            if (layoutType === 'city') {
+                ctx.fillStyle = '#73a338';
+                for (let el of groundElements) {
+                    ctx.beginPath(); ctx.arc(startX + el.x + el.w/2, groundY - 5 + el.offsetY, el.w/2.5 + 5, 0, Math.PI); ctx.fill();
+                }
+                ctx.fillStyle = palette.grassTop; ctx.fillRect(startX, groundY - 20, TILE_WIDTH, 20);
+                ctx.fillStyle = palette.groundRockDark; ctx.fillRect(startX, groundY, TILE_WIDTH, 10);
+                ctx.fillStyle = palette.groundRock; ctx.fillRect(startX, groundY + 10, TILE_WIDTH, height - groundY - 10);
+                ctx.fillStyle = '#cfd3db';
+                for (let lX = startX; lX < startX + TILE_WIDTH; lX += 150) {
+                    ctx.fillRect(lX + 30, groundY + 50, 80, 8);
+                }
+            } else {
+                ctx.fillStyle = palette.groundRock; ctx.fillRect(startX, groundY, TILE_WIDTH, height - groundY);
+                for (let el of groundElements) {
+                    const elX = startX + el.x;
+                    ctx.fillStyle = palette.groundRockDark; ctx.beginPath(); ctx.moveTo(elX, groundY + 30); ctx.lineTo(elX + el.w/2, groundY + 10 + el.offsetY); ctx.lineTo(elX + el.w, groundY + 40); ctx.lineTo(elX + el.w, height); ctx.lineTo(elX, height); ctx.fill();
+                    ctx.fillStyle = palette.grassTop; ctx.beginPath(); ctx.roundRect(elX, groundY - 20 + el.offsetY, el.w + 2, 25, [5, 5, 0, 0]); ctx.fill();
+                    ctx.fillStyle = palette.grassBottom; ctx.fillRect(elX, groundY + 5 + el.offsetY, el.w + 2, 10);
+                    ctx.beginPath(); ctx.arc(elX + el.w * 0.3, groundY + 15 + el.offsetY, 8, 0, Math.PI); ctx.arc(elX + el.w * 0.7, groundY + 15 + el.offsetY, 12, 0, Math.PI); ctx.fill();
+
+                    if (layoutType === 'forest' && el.hasFlower) {
+                        ctx.save(); ctx.translate(elX + el.w/2, groundY - 20 + el.offsetY);
+                        ctx.fillStyle = '#6cb538'; ctx.fillRect(-2, -10, 4, 10); 
+                        ctx.fillStyle = el.flowerType === 1 ? '#ffeb3b' : '#ab73db';
+                        for(let f=0; f<5; f++) { ctx.rotate(Math.PI*2 / 5); ctx.beginPath(); ctx.ellipse(0, -12, 4, 6, 0, 0, Math.PI*2); ctx.fill(); }
+                        ctx.fillStyle = el.flowerType === 1 ? '#ff9800' : '#fce4ec'; ctx.beginPath(); ctx.arc(0, -8, 4, 0, Math.PI*2); ctx.fill();
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // --- ПРЕПЯТСТВИЯ ---
+        function drawCactus(ctx, x, y) {
+            ctx.save(); ctx.translate(x, y); const scale = 0.85; ctx.scale(scale, scale);
+            ctx.fillStyle = '#8c5a45'; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill();
+            const baseGreen = '#2e9c3b'; const darkGreen = '#1f7029'; const lightGreen = '#52c45f';
+            ctx.fillStyle = baseGreen;
+            ctx.beginPath(); ctx.moveTo(15, -40); ctx.quadraticCurveTo(60, -30, 60, -80); ctx.lineTo(40, -80); ctx.quadraticCurveTo(40, -50, 15, -60); ctx.fill(); ctx.beginPath(); ctx.arc(50, -80, 10, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-15, -50); ctx.quadraticCurveTo(-55, -40, -55, -75); ctx.lineTo(-35, -75); ctx.quadraticCurveTo(-35, -60, -15, -70); ctx.fill(); ctx.beginPath(); ctx.arc(-45, -75, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = baseGreen; ctx.beginPath(); ctx.ellipse(0, -65, 30, 65, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = darkGreen; ctx.beginPath(); ctx.ellipse(12, -65, 8, 60, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = lightGreen; ctx.beginPath(); ctx.ellipse(-12, -65, 8, 60, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f24b88'; 
+            const drawSpike = (sx, sy, angle) => { ctx.save(); ctx.translate(sx, sy); ctx.rotate(angle); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-6, -3); ctx.lineTo(-6, 3); ctx.fill(); ctx.restore(); };
+            drawSpike(-30, -50, 0.3); drawSpike(30, -60, 2.8); drawSpike(-25, -90, 0.6); drawSpike(25, -100, 2.5);
+            ctx.fillStyle = '#f24b88'; ctx.beginPath(); ctx.arc(0, -145, 16, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ff8ab4'; ctx.beginPath(); ctx.arc(0, -135, 10, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawCrate(ctx, x, y) {
+            ctx.save(); ctx.translate(x, y - 35); 
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 35, 35, 8, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#c09257'; ctx.fillRect(-35, -35, 70, 70);
+            ctx.fillStyle = '#9c6f37'; ctx.fillRect(-27, -27, 54, 54);
+            ctx.fillStyle = '#875d2b'; ctx.fillRect(-27, -18, 54, 4); ctx.fillRect(-27, -2, 54, 4); ctx.fillRect(-27, 14, 54, 4);
+            ctx.fillStyle = '#c09257'; ctx.save(); ctx.rotate(Math.PI / 4); ctx.fillRect(-45, -6, 90, 12); ctx.fillStyle = '#a87e45'; ctx.fillRect(-45, 4, 90, 2); ctx.restore();
+            ctx.save(); ctx.rotate(-Math.PI / 4); ctx.fillRect(-45, -6, 90, 12); ctx.fillStyle = '#a87e45'; ctx.fillRect(-45, 4, 90, 2); ctx.restore();
+            ctx.restore();
+        }
+
+        function drawCar(ctx, x, y) {
+            ctx.save(); ctx.translate(x, y - 20); const s = 0.85; ctx.scale(s, s);
+            ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 25, 70, 10, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ff2a2a';
+            ctx.beginPath(); ctx.moveTo(-60, 15); ctx.lineTo(60, 15); ctx.lineTo(65, -5);
+            ctx.quadraticCurveTo(55, -40, 20, -45); ctx.lineTo(-15, -45); ctx.quadraticCurveTo(-45, -40, -60, -10); 
+            ctx.lineTo(-70, -5); ctx.quadraticCurveTo(-75, 5, -60, 15); ctx.fill();
+            ctx.fillStyle = '#a8e4ff'; ctx.beginPath(); ctx.moveTo(-15, -38); ctx.lineTo(15, -38); ctx.lineTo(25, -12); ctx.lineTo(-35, -12); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = '#e60000'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(0, -12); ctx.stroke();
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke(); 
+            const drawWheel = (wx, wy) => {
+                ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(wx, wy, 16, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#d1d1d1'; ctx.beginPath(); ctx.arc(wx, wy, 9, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
+            };
+            drawWheel(-40, 15); drawWheel(40, 15);
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-65, -3, 5, 8, -0.3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.ellipse(-68, 5, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#8a0000'; ctx.beginPath(); ctx.ellipse(62, 0, 4, 8, 0, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawFinishLine(ctx, x, y) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = '#8c5a45'; ctx.beginPath(); ctx.ellipse(5, 0, 30, 8, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#c2a07c'; ctx.fillRect(-5, -160, 10, 160);
+            ctx.fillStyle = 'white'; ctx.fillRect(5, -150, 70, 50);
+            ctx.fillStyle = '#1a1a1a'; ctx.fillRect(5, -150, 35, 25); ctx.fillRect(40, -125, 35, 25);
+            ctx.restore();
+        }
+
+        function drawDinosaur(ctx, x, y, walkPhase) {
+            ctx.save();
+            const scale = 0.8;
+            const bounce = isJumping ? 0 : Math.abs(Math.sin(walkPhase * 0.04)) * 12;
+            ctx.translate(x, y + dinoYOffset - bounce); ctx.scale(scale, scale);
+
+            const colorMain = '#5cb368'; const colorDark = '#205c33'; const colorBelly = '#8bd19a'; 
+            const walkSwing = isJumping ? 0 : walkPhase;
+            const legSwing1 = Math.sin(walkSwing * 0.04) * 0.6;
+            const legSwing2 = Math.sin(walkSwing * 0.04 + Math.PI) * 0.6;
+
+            ctx.fillStyle = colorDark; ctx.save(); ctx.translate(-15, 0); ctx.rotate(legSwing2); ctx.beginPath(); ctx.ellipse(0, -15, 14, 25, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.roundRect(-10, 5, 24, 14, 5); ctx.fill(); ctx.restore();
+            ctx.save(); ctx.translate(20, -55); ctx.rotate(legSwing2 * 0.5 - 0.2); ctx.beginPath(); ctx.roundRect(0, -5, 18, 10, 5); ctx.fill(); ctx.restore();
+
+            ctx.fillStyle = colorMain; ctx.beginPath(); ctx.moveTo(-10, -20); ctx.quadraticCurveTo(-70, -5, -95, -60); ctx.quadraticCurveTo(-60, 25, 0, 15); ctx.fill();
+            ctx.fillStyle = colorDark;
+            [{x:-10,y:-140,a:-0.3},{x:-25,y:-120,a:-0.6},{x:-35,y:-95,a:-0.9},{x:-45,y:-70,a:-1.1},{x:-55,y:-45,a:-1.3},{x:-75,y:-45,a:-1.5}].forEach(s => {
+                ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a); ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.lineTo(0, -22); ctx.fill(); ctx.restore();
+            });
+            ctx.fillStyle = colorMain; ctx.beginPath(); ctx.ellipse(-10, -45, 45, 60, Math.PI / 8, 0, Math.PI*2); ctx.fill();
+            ctx.save(); ctx.beginPath(); ctx.ellipse(-10, -45, 45, 60, Math.PI / 8, 0, Math.PI*2); ctx.clip(); ctx.fillStyle = colorBelly; ctx.beginPath(); ctx.ellipse(22, -35, 25, 55, Math.PI / 8, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#6db87e'; ctx.lineWidth = 3; for(let i=0; i<4; i++) { ctx.beginPath(); ctx.moveTo(5, -65 + i*14); ctx.lineTo(35, -55 + i*14); ctx.stroke(); } ctx.restore();
+
+            ctx.fillStyle = colorMain; ctx.save(); ctx.translate(-5, 5); ctx.rotate(legSwing1); ctx.beginPath(); ctx.ellipse(0, -20, 18, 30, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.roundRect(-12, 5, 30, 15, [8, 15, 5, 5]); ctx.fill(); ctx.fillStyle = colorDark; ctx.beginPath(); ctx.moveTo(15, 18); ctx.lineTo(18, 15); ctx.lineTo(12, 12); ctx.fill(); ctx.restore();
+            ctx.fillStyle = colorMain; ctx.beginPath(); ctx.arc(0, -110, 38, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.roundRect(-5, -125, 55, 42, 20); ctx.fill();
+            ctx.save(); ctx.translate(25, -50); ctx.rotate(legSwing1 * 0.5); ctx.beginPath(); ctx.roundRect(0, -8, 22, 12, 6); ctx.fill(); ctx.fillStyle = colorDark; ctx.beginPath(); ctx.moveTo(19, -4); ctx.lineTo(23, -6); ctx.lineTo(23, -2); ctx.fill(); ctx.restore();
+            
+            ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(12, -120, 7, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(14, -122, 2.5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f28b80'; ctx.beginPath(); ctx.arc(5, -100, 8, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(22, -110, 18, Math.PI * 0.15, Math.PI * 0.5); ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- РЕНДЕР И ИГРОВОЙ ЦИКЛ ---
+        function drawLayer(items, scrollOffset, drawFunc) {
+            const tilesNeeded = Math.ceil(width / TILE_WIDTH) + 1;
+            const normalizedOffset = scrollOffset % TILE_WIDTH;
+            for (let i = 0; i < tilesNeeded; i++) {
+                const startX = -normalizedOffset + (i * TILE_WIDTH);
+                if (items) { for (let item of items) drawFunc(item, startX); } else { drawFunc(startX); }
+            }
+        }
+
+        function render() {
+            // Определяем фон: Во время загрузки рисуем закат
+            let paletteName = getLevelType(currentLevel);
+            let layoutType = paletteName;
+            
+            if (gameState === 'loading') {
+                paletteName = 'sunset';
+                layoutType = 'mountains';
+            } else if (gameState === 'menu') {
+                paletteName = 'forest';
+                layoutType = 'forest';
+            }
+            
+            const palette = colors[paletteName];
+
+            ctx.clearRect(0, 0, width, height);
+            drawSky(palette);
+
+            drawLayer(clouds, scrollPos * 0.1, (cloud, startX) => { drawCloud(startX + cloud.x, cloud.y, cloud.scale, palette, cloud.opacity); });
+
+            const bgGroundLevel = height - 100;
+            if (layoutType === 'city') {
+                drawLayer(cityBuildingsFar, scrollPos * 0.2, (b, startX) => drawBuilding(startX + b.x, bgGroundLevel, b.w, b.h, palette.bgFar, b.type));
+                drawLayer(cityBuildingsNear, scrollPos * 0.5, (b, startX) => drawBuilding(startX + b.x, bgGroundLevel, b.w, b.h, palette.bgNear, b.type));
+                drawLayer(cityTrees, scrollPos * 0.8, (t, startX) => drawCityTree(startX + t.x, bgGroundLevel, t.scale));
+            } else if (layoutType === 'forest') {
+                drawLayer(forestFar, scrollPos * 0.3, (t, startX) => drawTree(startX + t.x, bgGroundLevel, t.w, t.h, palette.bgFar));
+                drawLayer(forestNear, scrollPos * 0.6, (t, startX) => drawTree(startX + t.x, bgGroundLevel, t.w, t.h, palette.bgNear));
+            } else {
+                drawLayer(mountainsFar, scrollPos * 0.3, (m, startX) => drawMountain(startX + m.x, bgGroundLevel, m.w, m.h, palette.bgFar, null));
+                drawLayer(mountainsNear, scrollPos * 0.6, (m, startX) => drawMountain(startX + m.x, bgGroundLevel, m.w, m.h, palette.bgNear, palette.snow));
+            }
+
+            drawLayer(null, scrollPos * 1.0, (startX) => drawGroundTile(startX, palette, layoutType));
+
+            const dinoGroundLevel = height - 120;
+            for (let obs of obstacles) {
+                if (obs.type === 'obstacle') {
+                    if (layoutType === 'city') drawCar(ctx, obs.x, dinoGroundLevel);
+                    else if (layoutType === 'forest') drawCrate(ctx, obs.x, dinoGroundLevel);
+                    else drawCactus(ctx, obs.x, dinoGroundLevel);
+                } else if (obs.type === 'finish') {
+                    drawFinishLine(ctx, obs.x, dinoGroundLevel);
+                }
+            }
+
+            drawDinosaur(ctx, width * 0.3, dinoGroundLevel, scrollPos);
+        }
+
+        function loop() {
+            if (gameState === 'loading') {
+                // АНИМАЦИЯ ЭКРАНА ЗАГРУЗКИ (ИИ ДИНОЗАВР БЕЖИТ И ПРЫГАЕТ)
+                scrollPos += baseSpeed;
+                loadProgress += 0.15; // Скорость заполнения шкалы (сделал медленнее)
+                
+                document.getElementById('loadingBarFill').style.width = Math.min(loadProgress, 100) + '%';
+                
+                const dinoHitboxX = width * 0.3 - 15;
+                const autoJumpDistance = 160;
+
+                // Спавн кактусов для загрузки
+                if (obstacles.length === 0 || (width - obstacles[obstacles.length - 1].x) > (600 + Math.random() * 400)) {
+                    obstacles.push({ x: width + 100, passed: false, type: 'obstacle' });
+                }
+
+                // Движение и ИИ-Прыжок
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    obstacles[i].x -= baseSpeed * 1.0;
+                    
+                    if (obstacles[i].type === 'obstacle') {
+                        // Динозавр сам решает когда прыгнуть!
+                        if (obstacles[i].x > dinoHitboxX && obstacles[i].x - dinoHitboxX < autoJumpDistance && !isJumping) {
+                            isJumping = true;
+                            dinoVelocityY = jumpForce;
+                        }
+                    }
+                    if (obstacles[i].x < -150) obstacles.splice(i, 1);
+                }
+
+                if (isJumping) {
+                    dinoVelocityY += gravity;
+                    dinoYOffset += dinoVelocityY;
+                    if (dinoYOffset >= 0) { dinoYOffset = 0; isJumping = false; dinoVelocityY = 0; }
+                }
+
+                // Загрузка завершена
+                if (loadProgress >= 100) {
+                    gameState = 'menu';
+                    switchScreen(screenMenu);
+                    obstacles.length = 0;
+                    dinoYOffset = 0;
+                }
+
+            } else if (gameState === 'playing') {
+                scrollPos += baseSpeed;
+
+                if (isJumping) {
+                    dinoVelocityY += gravity;
+                    dinoYOffset += dinoVelocityY;
+                    if (dinoYOffset >= 0) { dinoYOffset = 0; isJumping = false; dinoVelocityY = 0; }
+                }
+
+                if (obstacles.length === 0 || (width - obstacles[obstacles.length - 1].x) > (700 + Math.random() * 800)) {
+                    if (spawnedObstacles < targetObstacles) {
+                        obstacles.push({ x: width + 100, passed: false, type: 'obstacle' });
+                        spawnedObstacles++;
+                    } else if (spawnedObstacles === targetObstacles) {
+                        obstacles.push({ x: width + 100, passed: false, type: 'finish' });
+                        spawnedObstacles++; 
+                    }
+                }
+
+                const dinoHitbox = { x: width * 0.3 - 15, y: height - 120 + dinoYOffset - 70, w: 30, h: 70 };
+                const levelType = getLevelType(currentLevel);
+
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    obstacles[i].x -= baseSpeed * 1.0;
+
+                    if (obstacles[i].type === 'obstacle') {
+                        let oW, oH, oOX, oOY; 
+                        if (levelType === 'city') { oW = 100; oH = 40; oOX = -50; oOY = -40; } 
+                        else if (levelType === 'forest') { oW = 54; oH = 54; oOX = -27; oOY = -62; } 
+                        else { oW = 20; oH = 70; oOX = -10; oOY = -70; }
+                        
+                        const obsHitbox = { x: obstacles[i].x + oOX, y: height - 120 + oOY, w: oW, h: oH };
+
+                        if (
+                            dinoHitbox.x < obsHitbox.x + obsHitbox.w &&
+                            dinoHitbox.x + dinoHitbox.w > obsHitbox.x &&
+                            dinoHitbox.y < obsHitbox.y + obsHitbox.h &&
+                            dinoHitbox.y + dinoHitbox.h > obsHitbox.y
+                        ) {
+                            gameState = 'gameOver';
+                            document.getElementById('goLevel').textContent = currentLevel;
+                            document.getElementById('goScore').textContent = score;
+                            switchScreen(screenGameOver);
+                        }
+
+                        if (!obstacles[i].passed && obstacles[i].x < width * 0.3 - 50) {
+                            obstacles[i].passed = true;
+                            score += 10;
+                            updateHUD();
+                        }
+                    } else if (obstacles[i].type === 'finish') {
+                        if (dinoHitbox.x > obstacles[i].x) {
+                            if (currentLevel >= 3) {
+                                gameState = 'gameComplete';
+                                document.getElementById('gcScore').textContent = score;
+                                switchScreen(screenGameComplete);
+                            } else {
+                                gameState = 'levelComplete';
+                                document.getElementById('lcLevel').textContent = currentLevel;
+                                document.getElementById('lcScore').textContent = score;
+                                switchScreen(screenLevelComplete);
+                            }
+                        }
+                    }
+
+                    if (obstacles[i].x < -150) obstacles.splice(i, 1);
+                }
+            } else if (gameState === 'menu') {
+                scrollPos += 1.5;
+            }
+
+            render();
+            requestAnimationFrame(loop);
+        }
+
+        // Старт
+        initGenerator();
+        render(); 
+        loop();
+
+    </script>
+</body>
+</html>
